@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/extrame/ole2"
 	"io"
 	"log"
+	"strings"
 )
 
 const oleCbHdr = uint16(28)
@@ -46,8 +48,12 @@ func (m *MTEFv5) readRecord() (err error) {
 	_ = binary.Read(m.reader, binary.LittleEndian, &m.mVersionSub)
 	m.mApplication, _ = m.readNullTerminatedString()
 	_ = binary.Read(m.reader, binary.LittleEndian, &m.mInline)
-
-	//fmt.Println(m.mMtefVer, m.mPlatform, m.mProduct, m.mVersion, m.mVersionSub)
+	//TODO: read  MTEF version=3
+	if m.mMtefVer != 5 {
+		fmt.Println("old version, not support yet! version=",m.mMtefVer)
+		return errors.New("ERROR: old version, not support yet! ")
+	}
+	// fmt.Println(m.mMtefVer, m.mPlatform, m.mProduct, m.mVersion, m.mVersionSub)
 	//fmt.Println(m.mInline)
 	//fmt.Println(m.reader)
 
@@ -484,16 +490,22 @@ func (m *MTEFv5) readColorDef(colorDef *MtColorDef) (err error) {
 }
 
 func (m *MTEFv5) Translate() string {
-	latexStr, err := m.makeLatex(m.ast)
-	if err != nil {
-		fmt.Println(err)
-	}
+	if   m  != nil && m.ast  != nil {
+		latexStr, err := m.makeLatex(m.ast)
 
-	if m.Valid {
-		return latexStr
-	} else {
-		return ""
+		if err != nil {
+			  fmt.Println(err)
+			 return "ERROR: TranslateErr="+err.Error()
+
+		}
+
+		if m.Valid {
+			return latexStr
+		} else {
+			return ""
+		}
 	}
+	 return "ERROR: MTEFv5 m=null or m.ast=null!"
 
 }
 
@@ -511,7 +523,7 @@ func (m *MTEFv5) makeAST() (err error) {
 
 	for _, node := range m.nodes {
 		//debug 可用
-		//fmt.Printf("%+v %+v \n", node.tag, node.value)
+		 //fmt.Printf("%+v %+v \n", node.tag, node.value)
 
 		switch node.tag {
 		case LINE:
@@ -700,14 +712,15 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			if ok {
 				char = sChar
 			}
+
 		}
 
 		//确定字符是否为文本，如果是文本，则需要包一层
 		if typefaceFmt != "" {
 			char = fmt.Sprintf(typefaceFmt, char)
 		}
-
 		buf.WriteString(char)
+		//fmt.Println("read char= "+char  )
 		return buf.String(), nil
 	case TMPL:
 		//强制类型转换为MtTmpl
@@ -736,6 +749,7 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			}
 
 			buf.WriteString(fmt.Sprintf("%v %v %v", leftStr, mainStr, rightStr))
+
 			return buf.String(), nil
 
 		case tmPAREN:
@@ -754,12 +768,14 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			}
 			if leftSlot != "" {
 				leftStr = fmt.Sprintf("\\left %v", leftSlot)
+
 			}
 			if rightSlot != "" {
 				rightStr = fmt.Sprintf("\\right %v", rightSlot)
 			}
 
 			buf.WriteString(fmt.Sprintf("%v %v %v", leftStr, mainStr, rightStr))
+			//fmt.Println("tmPAREN read char= "+buf.String()  )
 			return buf.String(), nil
 		case tmBRACE:
 			var mainSlot, leftSlot, rightSlot string
@@ -783,7 +799,7 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			buf.WriteString(fmt.Sprintf(
 				"\\left %v \\begin{array}{l} %v \\end{array} \\right%v",
 				leftSlot, mainSlot, rightSlot))
-
+			//	fmt.Println("tmBRACE read char= "+buf.String()  )
 			return buf.String(), nil
 		case tmBRACK:
 			mainAST := ast.children[0]
@@ -796,20 +812,33 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			leftSlot, _ := m.makeLatex(leftAST)
 			rightSlot, _ := m.makeLatex(rightAST)
 			buf.WriteString(fmt.Sprintf("\\left%v %v \\right%v", leftSlot, mainSlot, rightSlot))
+			//	fmt.Println("tmBRACK read char= "+buf.String()  )
+
 			return buf.String(), nil
 		case tmBAR:
 			//读取数据 ParBoxClass
 			var mainSlot, leftSlot, rightSlot string
+
 			for idx, astData := range ast.children {
 				if idx == 0 {
 					mainSlot, _ = m.makeLatex(astData)
 				} else if idx == 1 {
-					leftSlot, _ = m.makeLatex(astData)
+					//文档里面没说明此variations设置，但出现了右边的符号变成左边的情况，参考其他配置修改；
+					//0×0001	tvFENCE_L	left fence is present
+					//0×0002	tvFENCE_R	right fence is present
+					if tmpl.variation == 0x0002 {
+						rightSlot, _ = m.makeLatex(astData)
+					} else {
+						leftSlot, _ = m.makeLatex(astData)
+					}
 				} else {
 					rightSlot, _ = m.makeLatex(astData)
 				}
 			}
 
+			if leftSlot == "" {
+				leftSlot = "."
+			}
 			if rightSlot == "" {
 				rightSlot = "."
 			} else {
@@ -831,7 +860,7 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			//组成整体公式
 			tmplStr := fmt.Sprintf("%v %v %v", leftStr, mainStr, rightStr)
 			buf.WriteString(tmplStr)
-
+			//	fmt.Println("tmBAR read char= "+buf.String()  )
 			return buf.String(), nil
 		case tmINTERVAL:
 			//读取数据 ParBoxClass
@@ -859,7 +888,7 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			//组成整体公式
 			tmplStr := fmt.Sprintf("%v %v %v", leftStr, mainStr, rightStr)
 			buf.WriteString(tmplStr)
-
+			//	fmt.Println("tmINTERVAL read char= "+buf.String()  )
 			return buf.String(), nil
 		case tmROOT:
 			mainAST := ast.children[0]
@@ -867,6 +896,7 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			mainSlot, _ := m.makeLatex(mainAST)
 			radiSlot, _ := m.makeLatex(radiAST)
 			buf.WriteString(fmt.Sprintf("\\sqrt[%v] { %v }", radiSlot, mainSlot))
+			//fmt.Println("tmROOT read char= "+buf.String()  )
 			return buf.String(), nil
 		case tmFRACT:
 			numAST := ast.children[0]
@@ -874,6 +904,8 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			numSlot, _ := m.makeLatex(numAST)
 			denSlot, _ := m.makeLatex(denAST)
 			buf.WriteString(fmt.Sprintf("\\frac { %v } { %v }", numSlot, denSlot))
+			//	fmt.Println("tmFRACT read char= "+buf.String()  )
+
 			return buf.String(), nil
 		case tmARROW:
 			/*
@@ -955,9 +987,9 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			//组成整体公式
 			tmplStr := fmt.Sprintf("%v %v %v", latexFmt, bottomStr, topStr)
 			buf.WriteString(tmplStr)
-
+			//fmt.Println("tmARROW read char= "+buf.String()  )
 			return buf.String(), nil
-		case tmUBAR:
+		case tmUBAR,tmOBAR:
 			//读取数据
 			mainAST := ast.children[0]
 
@@ -967,7 +999,16 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			//转成latex代码
 			var mainStr string
 			if mainSlot != "" {
-				mainStr = fmt.Sprintf(" {\\underline{ %v }} ", mainSlot)
+
+				//需要把空格替换，否则只会显示一个短线
+				mainSlot := strings.Replace(mainSlot, "\\ ", " ", -1)
+				mainSlot = strings.Replace(mainSlot, " ", "\\;", -1)
+				//0×0001 tvBAR_DOUBLE bar is doubled, else single
+				if tmpl.variation == 0x0001 {
+					mainStr = fmt.Sprintf(" {\\underline{\\underline{ %v }}} ", mainSlot)
+				} else {
+					mainStr = fmt.Sprintf(" {\\underline{ %v }} ", mainSlot)
+				}
 			}
 
 			//组成整体公式
@@ -976,7 +1017,7 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 
 			//返回数据
 			return buf.String(), nil
-		case tmSUM:
+		case tmSUM, tmINTEG: //15,16同类型BigOpBoxClass，所以用同一种解析
 			//读取数据 BigOpBoxClass
 			var mainSlot, upperSlot, lowerSlot, operatorSlot string
 			for idx, astData := range ast.children {
@@ -1208,7 +1249,16 @@ func (m *MTEFv5) makeLatex(ast *MtAST) (latex string, err error) {
 			buf.WriteString(tmplStr)
 
 			return buf.String(), nil
+		case BAR:
+			if ast.children == nil {
+				//长等号的识别
+				tmplStr := fmt.Sprintf("\\overline{ \\overline{{\\kern 20pt}}}  ")
+				buf.WriteString(tmplStr)
+				return buf.String(), nil
+			}
+			return "ERROR:not equal!", nil
 		default:
+
 			m.Valid = false
 			log.Println("TMPL NOT IMPLEMENT", tmpl.selector, tmpl.variation)
 		}
@@ -1289,16 +1339,19 @@ func Open(reader io.ReadSeeker) (eqn *MTEFv5, err error) {
 	//parse `mtef` stream from `ole` object
 	ole, err := ole2.Open(reader, "")
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	dir, err := ole.ListDir()
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
-
+	//for _, file1 := range dir {
+	//	fmt.Println(file1.Name());
+	//}
 	for _, file := range dir {
-		if "Equation Native" == file.Name() {
+
+		 if "Equation Native" == file.Name()  {
 			root := dir[0]
 			reader := ole.OpenFile(file, root)
 
@@ -1330,7 +1383,7 @@ func Open(reader io.ReadSeeker) (eqn *MTEFv5, err error) {
 			}
 
 			return nil, err
-		}
+ 		}
 	}
 	return nil, err
 }

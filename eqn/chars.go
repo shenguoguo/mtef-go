@@ -12,8 +12,7 @@ var SpecialChar = map[string]string{
 	"{": "\\{",
 	"|": "\\|",
 	"}": "\\}",
-}
-
+} 
 var Chars = map[string]string{
 	"char/0x0020":          " ",
 	"char/0x0021":          "!",
@@ -568,7 +567,7 @@ var Chars = map[string]string{
 	"char/0x225d/mathmode": "\\overset{\\underset{\\mathrm{def}}{}}{=}",
 	"char/0x225e/mathmode": "\\overset{\\underset{\\mathrm{m}}{}}{=}",
 	"char/0x225f/mathmode": "\\overset{?}{=}",
-	"char/0x2260/mathmode": "\\ne ",
+	"char/0x2260/mathmode": "\\neq ",
 	"char/0x2261/mathmode": "\\equiv ",
 	"char/0x2262/mathmode": "\\not\\equiv ",
 	"char/0x2264/mathmode": "\\le ",
@@ -936,4 +935,33 @@ var Chars = map[string]string{
 	"char/0x003c":          " < ",
 	"char/0x0302":          "\\widehat ",
 	"char/0x86e0":          "\\prime ",
+	"char/0x2208":          "\\in ",//∈
+	"char/0x2208/textmode":  "\\in ",//∈
+	"char/0x2264": "\\le ",
+	"char/0x2264/textmode": "\\le ",//≤
+	"char/0x2265": "\\ge ",
+	"char/0x2265/textmode": "\\ge ",//≥
+	"char/0x221e": "\\infty ", //∞
+	"char/0x221e/textmode": "\\infty ",
+	"char/0x2260": "\\neq ",
+	"char/0x2260/textmode": "\\neq ",
+	"char/0x2229": "\\cap ",
+	"char/0x2229/textmode": "\\cap ",
+	"char/0x222a": "\\cup ",
+	"char/0x222a/textmode": "\\cup ",
+	"char/0x2205": "\\varnothing ",
+	"char/0x2205/textmode": "\\varnothing ",
+	"char/0x2715": "\\times ",
+	"char/0x2715/textmode": "\\times ",
+	"char/0x03b1/textmode": "\\alpha ",
+	"char/0x03b1": "\\alpha ",
+	"char/0x0391/textmode": "\\Alpha ",
+	"char/0x0391": "\\Alpha ",
+	"char/0x00d7/textmode": "\\times ",
+	"char/0x00d7": "\\times ",
+	 "char/0xef00/textmode": " & ",
+	 "char/0xef00": " \\& ",
+
+//从以下网址把特殊符号编码；
+//https://www.haomeili.net/Code/DetailCodes?wd=%E2%89%A4
 }

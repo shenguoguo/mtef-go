@@ -221,6 +221,7 @@ const (
 	tmFLOOR   SelectorType = 6 //	floor brackets	ParBoxClass
 	tmCEILING SelectorType = 7 //	ceiling brackets	ParBoxClass
 	tmOBRACK  SelectorType = 8 //	open (white) brackets	ParBoxClass
+
 	//variations	variation bits	symbol	description
 	//0×0001	tvFENCE_L	left fence is present
 	//0×0002	tvFENCE_R	right fence is present
@@ -257,6 +258,7 @@ const (
 	//selector	symbol	description	class
 	tmUBAR SelectorType = 12 //	underbar	BarBoxClass
 	tmOBAR SelectorType = 13 //	overbar	BarBoxClass
+	BAR SelectorType = 128 //	长等号
 	//variations	variation bits	symbol	description
 	//0×0001	tvBAR_DOUBLE	bar is doubled, else single
 
